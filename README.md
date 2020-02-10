@@ -7,7 +7,7 @@ Darkball is a game for Blinks by Move38
 like 1-D pong, but weirder
 timing is everything
 
-##Setup:
+## Setup:
 Place Blinks tiles in a single path or multiple branches.
 
 Each player controls just one Blinks tile at the end of a branch. 
@@ -29,7 +29,7 @@ Red tiles aren't connected to anything.
 Double click red tiles to reset the tile to use as a new endpoint.
 
 
-##Issues:
-no juicy animations yet
-endpoints changes to cyan momentarily when it recieves the ball (even if you successfully hit it)
+## Issues:
+-- no juicy animations yet
+-- endpoints changes to cyan momentarily when it recieves the ball (even if you successfully hit it)
 
