@@ -1,8 +1,8 @@
 # Darkball-Blinks
 Darkball is a game for Blinks by Move38
 
-- 1-infinite players?
-- 1-10 minute playtime
+- 1 - ∞
+- 1 - 10 minute playtime
 
 - like 1-D pong, but weirder
 - timing is everything
@@ -14,7 +14,7 @@ Darkball is a game for Blinks by Move38
 - Tiles that are connected to one tile are considered endpoints.
 - One player should be at each endpoint.
 
-### Tiles
+## Tiles
 - Cyan tiles are endpoints that have the ball.
 - Green tiles are endpoints without the ball.
 - Yellow tiles are paths
