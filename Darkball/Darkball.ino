@@ -1,6 +1,23 @@
 /*Darkball
    by Che-Wei Wang,  CW&T
    for Blinks by Move38
+
+  setup:
+   place blinks in a single path (two player mode), or branches (multiplayer mode), or a single path with a loop ( P shape, single player mode)
+   endpoints will be green
+   paths will be yellow
+   cyan endpoints have the ball
+
+
+  each player plays at one endpoint. finger on the end tile
+  
+
+   cyan endpoints can send the ball along the path
+   green endpoints try to hit the ball back
+   if players swing too late, or swing too early, they lose a point
+  game ends when one player to loses 6 points
+
+
 */
 
 
