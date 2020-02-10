@@ -1,5 +1,5 @@
 # Darkball-Blinks
-Darkball is a game for Blinks by Move38
+Darkball is a game by CW&T for Blinks by Move38
 
 - 1 - ∞
 - 1 - 10 minute playtime
