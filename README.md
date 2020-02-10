@@ -30,6 +30,6 @@ Double click red tiles to reset the tile to use as a new endpoint.
 
 
 ## Issues:
--- no juicy animations yet
--- endpoints changes to cyan momentarily when it recieves the ball (even if you successfully hit it)
+- no juicy animations yet
+- endpoints changes to cyan momentarily when it recieves the ball (even if you successfully hit it)
 
