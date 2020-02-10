@@ -18,15 +18,17 @@ byte ball[] { 1, 0, 6, 3 }; //speed, n rounds ball has been played, last path le
 
 #define MAGIC_VALUE 42
 
-boolean neighbors[ FACE_COUNT ];
+boolean hasNeigbhorAtFace[ FACE_COUNT ];
 byte neighborCount = 0;
 long lastMillis = 0;
 int sendBall = -1;
-boolean hasBall = false;
-byte hp = FACE_COUNT + 1;
+byte hp = FACE_COUNT ;
 byte lastNeighbor;
 long lastReceivedBall = 0;
-byte ballResponseRange = 200;
+byte ballResponseRange = 400;
+boolean hasBall = true;
+boolean swungAndMissed = true;
+
 
 void setup() {
   setValueSentOnAllFaces(MAGIC_VALUE);
@@ -48,20 +50,20 @@ int memcmp(const void *s1, const void *s2, unsigned n)
 
 void loop() {
 
-  // First check all faces for an incoming datagram
-  if (sendBall >= 0) {
-    if (millis() - lastMillis > ball[0]) {
-
-      setColorOnFace( OFF ,  sendBall  );
-      sendDatagramOnFace( &ball , sizeof( ball ) , sendBall );
-      showColorOnFaceTimer[sendBall].set( SHOW_COLOR_TIME_MS );
-      sendBall = -1;
+  if (sendBall >= 0) { //if i have the ball
+    if (millis() - lastMillis > ball[0]) { //wait ball speed
+      setColorOnFace( OFF ,  sendBall  ); //turn off lights
+      sendDatagramOnFace( &ball , sizeof( ball ) , sendBall ); //send ball
+      showColorOnFaceTimer[sendBall].set( SHOW_COLOR_TIME_MS ); //set face color
+      sendBall = -1; //set sendball to -1
     }
 
   }
+
+  // First check all faces for an incoming datagram
   FOREACH_FACE(f) {
 
-    if ( isDatagramReadyOnFace( f ) ) {
+    if ( isDatagramReadyOnFace( f ) ) { //received ball
 
       const byte *datagramPayload = getDatagramOnFace(f);
 
@@ -73,31 +75,37 @@ void loop() {
         // This is the datagram we are looking for!
 
         //update ball
-        ball[0] = datagramPayload[0]; //speed
+        ball[0] = datagramPayload[0]; //get ball speed
 
 
-        setColorOnFace( OFF , f );
+        setColorOnFace( OFF , f ); // draw dark ball
         lastMillis = millis();
+
+        int avalableNeighboringFaces[FACE_COUNT];
+        int count = 0;
         //find next available face
-        //boolean isEnd = true;
         FOREACH_FACE(nf) { //cycle through faces
           if (f != nf) { //don't check face that just received data
-            if (neighbors[nf]  ) { //if face is connected
+            if (hasNeigbhorAtFace[nf]) { //if face is connected
               //set face to send ball
-              sendBall = nf;
+              avalableNeighboringFaces[count] = nf;
+              count++;
+              //sendBall = nf;
               //isEnd = false;
             }
           }
         }
+        if (count > 0) sendBall = avalableNeighboringFaces[int(random(count - 1))];
 
         if (neighborCount == 1) { //received the ball and is the end
-          //hasBall=true;
+          hasBall = true;
           lastReceivedBall = millis();
-          hp--;
+          //hp--;
           //          setColorOnFace( RED ,  f  );
           //          showColorOnFaceTimer[f].set( SHOW_COLOR_TIME_MS );
 
         }
+        else hasBall = false;
 
       }
       //      else {
@@ -122,7 +130,7 @@ void loop() {
         // Show green if we do have a neighbor
 
         if (getLastValueReceivedOnFace(f) == MAGIC_VALUE ) { //connected to neighbor
-          neighbors[f] = true;
+          hasNeigbhorAtFace[f] = true;
           setColorOnFace( YELLOW , f );
 
         } else {
@@ -131,14 +139,14 @@ void loop() {
 
       } else {
         // Or off if no neighbor
-        neighbors[f] = false;
+        hasNeigbhorAtFace[f] = false;
         setColorOnFace( OFF , f );
       }
 
-      //count neighbors
+      //count hasNeigbhorAtFace
       neighborCount = 0;
       for (int i = 0; i < FACE_COUNT; i++) {
-        if (neighbors[i]) {
+        if (hasNeigbhorAtFace[i]) {
           neighborCount++;
           lastNeighbor = i;
         }
@@ -146,14 +154,22 @@ void loop() {
       if (neighborCount == 1) {//endpoint
         int count = lastNeighbor + 1; //light up from "top" (connection to path)
         FOREACH_FACE(f) {
-          if (count < hp + lastNeighbor + 1) setColorOnFace( GREEN, count % FACE_COUNT );
-          else setColorOnFace (RED, count % FACE_COUNT );
+          if (count < hp + lastNeighbor + 1) {
+            if (hasBall)
+              setColorOnFace( CYAN, count % FACE_COUNT );
+            else setColorOnFace( GREEN, count % FACE_COUNT );
+          }
+          else {
+            if (hasBall)
+              setColorOnFace( ORANGE, count % FACE_COUNT );
+            else setColorOnFace( RED, count % FACE_COUNT );
+          }
           count++;
           if (hp <= 0) {
             //explode
 
             //reset
-            hp = FACE_COUNT + 1;
+            hp = FACE_COUNT ;
           }
 
         }
@@ -166,21 +182,35 @@ void loop() {
 
   if (buttonPressed()) {
     // When the button is click, trigger a datagram send on all faces
-    if (neighborCount == 1 )//check if i'm an endpoint and have ball
+    if (neighborCount == 1 ) { //check if i'm an endpoint and have ball
 
-      if (millis() - lastReceivedBall > 0  || hp > FACE_COUNT) { //in possession of ball  or is first time after reset
+      if (swungAndMissed && hasBall) {
         shoot();
-        //lastReceivedBall = 0;
+      }
+      else if (hasBall) {
         if (millis() - lastReceivedBall < ballResponseRange ) { //if i have the ball and i hit it in time
           //hp++;
           if (hp > FACE_COUNT)hp = FACE_COUNT; //max hp
+          shoot();
 
-        } else { //swing and miss
+        } else { //swing too late
           hp--;
-
+          swungAndMissed = true;
         }
-
       }
+      else { //swing too early
+        hp--;
+        swungAndMissed = true;
+        //shoot();
+        //hasBall = false;
+      }
+    }
+  }
+
+  if (neighborCount == 0 && buttonDoubleClicked) {
+    hasBall = true;
+    hp = FACE_COUNT ;
+
   }
 
 }
@@ -189,12 +219,10 @@ void loop() {
 
 void shoot() {
   FOREACH_FACE(f) {
-
-    ball[0] = byte(int(random(110))); //random speed
+    ball[0] = byte(int(random(120))); //random speed
     //ball[1] = byte(int(random(5))); //when to show
-
     sendDatagramOnFace( &ball , sizeof( ball ) , f );
-
-
   }
+  swungAndMissed = false;
+  hasBall = false;
 }
