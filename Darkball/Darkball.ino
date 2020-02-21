@@ -10,16 +10,22 @@
 
 
   each player plays at one endpoint. finger on the end tile
-  
+
 
    cyan endpoints can send the ball along the path
    green endpoints try to hit the ball back
    if players swing too late, or swing too early, they lose a point
   game ends when one player to loses 6 points
 
+  todo:
+  set ball speed based on accuracy
+
+  change path color
+  juicy stuff
+  color sparkle trail. based on speed. hue wave, and saturation 200m
+  double click for super mode
 
 */
-
 
 
 // Did we get an error onthis face recently?
@@ -42,10 +48,12 @@ int sendBall = -1;
 byte hp = FACE_COUNT ;
 byte lastNeighbor;
 long lastReceivedBall = 0;
-byte ballResponseRange = 400;
+int ballResponseRange = 200;
 boolean hasBall = true;
-boolean swungAndMissed = true;
-
+boolean missed = true;
+boolean swung = false;
+long lastSwing = 0;
+int slowestBallSpeed = 110; //bigger is slower
 
 void setup() {
   setValueSentOnAllFaces(MAGIC_VALUE);
@@ -67,6 +75,7 @@ int memcmp(const void *s1, const void *s2, unsigned n)
 
 void loop() {
 
+  //pass the ball along
   if (sendBall >= 0) { //if i have the ball
     if (millis() - lastMillis > ball[0]) { //wait ball speed
       setColorOnFace( OFF ,  sendBall  ); //turn off lights
@@ -75,7 +84,17 @@ void loop() {
       sendBall = -1; //set sendball to -1
     }
 
+
   }
+
+
+  if (hasBall && neighborCount == 1 && missed == false)  { //if I have the ball and and I'm an endpoint
+    if ( millis() - lastReceivedBall > ballResponseRange) { //never swung or swung too late
+      hp--;
+      missed = true;
+    }
+  }
+
 
   // First check all faces for an incoming datagram
   FOREACH_FACE(f) {
@@ -112,15 +131,18 @@ void loop() {
             }
           }
         }
+
         if (count > 0) sendBall = avalableNeighboringFaces[int(random(count - 1))];
 
         if (neighborCount == 1) { //received the ball and is the end
           hasBall = true;
           lastReceivedBall = millis();
-          //hp--;
-          //          setColorOnFace( RED ,  f  );
-          //          showColorOnFaceTimer[f].set( SHOW_COLOR_TIME_MS );
-
+          //check if swing is early or late
+          if (swung ) {
+            if ( millis() - lastSwing < ballResponseRange ) { //if i have the ball and i hit it in time
+             shoot((millis() - lastSwing) / float(ballResponseRange)); 
+            }
+          }
         }
         else hasBall = false;
 
@@ -145,14 +167,15 @@ void loop() {
       if ( !isValueReceivedOnFaceExpired( f ) ) {
 
         // Show green if we do have a neighbor
-
+        //path color
         if (getLastValueReceivedOnFace(f) == MAGIC_VALUE ) { //connected to neighbor
           hasNeigbhorAtFace[f] = true;
-          setColorOnFace( YELLOW , f );
+          setColorOnFace( makeColorHSB( 33 , 255 , 255 ) , f );
 
-        } else {
-          setColorOnFace( CYAN, f );
         }
+        //        else {
+        //          setColorOnFace( CYAN, f );
+        //        }
 
       } else {
         // Or off if no neighbor
@@ -172,8 +195,7 @@ void loop() {
         int count = lastNeighbor + 1; //light up from "top" (connection to path)
         FOREACH_FACE(f) {
           if (count < hp + lastNeighbor + 1) {
-            if (hasBall)
-              setColorOnFace( CYAN, count % FACE_COUNT );
+            if (hasBall && missed == true) setColorOnFace( CYAN, count % FACE_COUNT );
             else setColorOnFace( GREEN, count % FACE_COUNT );
           }
           else {
@@ -201,45 +223,47 @@ void loop() {
     // When the button is click, trigger a datagram send on all faces
     if (neighborCount == 1 ) { //check if i'm an endpoint and have ball
 
-      if (swungAndMissed && hasBall) {
-        shoot();
-      }
-      else if (hasBall) {
-        if (millis() - lastReceivedBall < ballResponseRange ) { //if i have the ball and i hit it in time
-          //hp++;
-          if (hp > FACE_COUNT)hp = FACE_COUNT; //max hp
-          shoot();
+      if (swung == false) { //only swing once
+        swung = true;
+        lastSwing = millis();
 
-        } else { //swing too late
-          hp--;
-          swungAndMissed = true;
+        if (hasBall && millis() - lastReceivedBall < ballResponseRange  ) { //if i have the ball and i hit it in time
+          shoot((millis() - lastReceivedBall) / float(ballResponseRange)); //sets swung to false etc.
+        }
+
+      }
+
+      //serve ball
+      if (missed) {
+        if ( hasBall && millis() - lastReceivedBall > 500) { //prevent hitting the ball if we just missed the ball
+          shoot(.5);
         }
       }
-      else { //swing too early
-        hp--;
-        swungAndMissed = true;
-        //shoot();
-        //hasBall = false;
-      }
+
+
     }
   }
 
   if (neighborCount == 0 && buttonDoubleClicked) {
     hasBall = true;
     hp = FACE_COUNT ;
-
+    missed = true;
   }
 
 }
 
 
 
-void shoot() {
+void shoot(float ballSpeed) {//0-1
+
+  byte s = ballSpeed * slowestBallSpeed;
+
   FOREACH_FACE(f) {
-    ball[0] = byte(int(random(120))); //random speed
+    ball[0] = byte(s); //random speed
     //ball[1] = byte(int(random(5))); //when to show
     sendDatagramOnFace( &ball , sizeof( ball ) , f );
   }
-  swungAndMissed = false;
+  missed = false;
   hasBall = false;
+  swung = false;
 }
