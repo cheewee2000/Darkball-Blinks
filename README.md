@@ -34,5 +34,4 @@ Darkball is a game by CW&T for Blinks
 
 ## Issues
 - no juicy animations yet
-- endpoints changes to cyan momentarily when it recieves the ball (even if you successfully hit it)
 
