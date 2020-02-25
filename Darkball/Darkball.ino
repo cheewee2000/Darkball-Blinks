@@ -18,7 +18,6 @@
   game ends when one player to loses 6 points
 
   todo:
-  set ball speed based on accuracy
 
   change path color
   juicy stuff
@@ -34,12 +33,13 @@ Timer errorOnFaceTimer[ FACE_COUNT ];
 const int showErrTime_ms = 500;    // Show the errror for 0.5 second so people can see it
 
 static Timer showColorOnFaceTimer[ FACE_COUNT ];
+static Timer gameOverTimer;
 
 #define SHOW_COLOR_TIME_MS  110   // Long enough to see
 
 byte ball[] { 1, 0, 6, 3 }; //speed, n rounds ball has been played, last path length, position to blink,
 
-#define MAGIC_VALUE 42
+#define MAGIC_VALUE 22
 
 boolean hasNeigbhorAtFace[ FACE_COUNT ];
 byte neighborCount = 0;
@@ -54,6 +54,8 @@ boolean missed = true;
 boolean swung = false;
 long lastSwing = 0;
 int slowestBallSpeed = 110; //bigger is slower
+int endAnimCount = 0;
+
 
 void setup() {
   setValueSentOnAllFaces(MAGIC_VALUE);
@@ -83,8 +85,6 @@ void loop() {
       showColorOnFaceTimer[sendBall].set( SHOW_COLOR_TIME_MS ); //set face color
       sendBall = -1; //set sendball to -1
     }
-
-
   }
 
 
@@ -109,30 +109,26 @@ void loop() {
       //if ( getDatagramLengthOnFace(f) == sizeof( ball )  &&  !memcmp( datagramPayload , ball , sizeof( ball )) )
       {
         // This is the datagram we are looking for!
-
         //update ball
         ball[0] = datagramPayload[0]; //get ball speed
-
 
         setColorOnFace( OFF , f ); // draw dark ball
         lastMillis = millis();
 
         int avalableNeighboringFaces[FACE_COUNT];
         int count = 0;
+
         //find next available face
         FOREACH_FACE(nf) { //cycle through faces
           if (f != nf) { //don't check face that just received data
             if (hasNeigbhorAtFace[nf]) { //if face is connected
-              //set face to send ball
-              avalableNeighboringFaces[count] = nf;
+              avalableNeighboringFaces[count] = nf;//set face to send ball
               count++;
-              //sendBall = nf;
-              //isEnd = false;
             }
           }
         }
 
-        if (count > 0) sendBall = avalableNeighboringFaces[int(random(count - 1))];
+        if (count > 0) sendBall = avalableNeighboringFaces[int(random(count - 1))]; //if there's a neighbor, send the ball there
 
         if (neighborCount == 1) { //received the ball and is the end
           hasBall = true;
@@ -140,88 +136,113 @@ void loop() {
           //check if swing is early or late
           if (swung ) {
             if ( millis() - lastSwing < ballResponseRange ) { //if i have the ball and i hit it in time
-             shoot((millis() - lastSwing) / float(ballResponseRange)); 
+              shoot((millis() - lastSwing) / float(ballResponseRange));
             }
           }
+          swung = false;
         }
         else hasBall = false;
 
       }
-      //      else {
-      //
-      //        // Oops, we goty a datagram, but not the one we are loooking for
-      //
-      //        setColorOnFace( RED , f );
-      //
-      //      }
 
-
-      showColorOnFaceTimer[f].set( SHOW_COLOR_TIME_MS );
 
       // We are done with the datagram, so free up the buffer so we can get another on this face
       markDatagramReadOnFace( f );
+    }
 
 
-    } else if ( showColorOnFaceTimer[f].isExpired() ) {
-
-      if ( !isValueReceivedOnFaceExpired( f ) ) {
-
-        // Show green if we do have a neighbor
-        //path color
-        if (getLastValueReceivedOnFace(f) == MAGIC_VALUE ) { //connected to neighbor
-          hasNeigbhorAtFace[f] = true;
-          setColorOnFace( makeColorHSB( 33 , 255 , 255 ) , f );
-
-        }
-        //        else {
-        //          setColorOnFace( CYAN, f );
-        //        }
-
-      } else {
-        // Or off if no neighbor
-        hasNeigbhorAtFace[f] = false;
-        setColorOnFace( OFF , f );
+    //path
+    if ( !isValueReceivedOnFaceExpired( f ) ) {
+      if (getLastValueReceivedOnFace(f) == MAGIC_VALUE ) { //connected to neighbor
+        hasNeigbhorAtFace[f] = true;
       }
-
-      //count hasNeigbhorAtFace
-      neighborCount = 0;
-      for (int i = 0; i < FACE_COUNT; i++) {
-        if (hasNeigbhorAtFace[i]) {
-          neighborCount++;
-          lastNeighbor = i;
-        }
-      }
-      if (neighborCount == 1) {//endpoint
-        int count = lastNeighbor + 1; //light up from "top" (connection to path)
-        FOREACH_FACE(f) {
-          if (count < hp + lastNeighbor + 1) {
-            if (hasBall && missed == true) setColorOnFace( CYAN, count % FACE_COUNT );
-            else setColorOnFace( GREEN, count % FACE_COUNT );
-          }
-          else {
-            if (hasBall)
-              setColorOnFace( ORANGE, count % FACE_COUNT );
-            else setColorOnFace( RED, count % FACE_COUNT );
-          }
-          count++;
-          if (hp <= 0) {
-            //explode
-
-            //reset
-            hp = FACE_COUNT ;
-          }
-
-        }
-      } else if (neighborCount == 0) {//not connected
-        setColor(RED);
-      }
+    }
+    else {
+      hasNeigbhorAtFace[f] = false;
     }
   }
 
 
+  //count hasNeigbhorAtFace
+  neighborCount = 0;
+  for (int i = 0; i < FACE_COUNT; i++) {
+    if (hasNeigbhorAtFace[i]) {
+      neighborCount++;
+      lastNeighbor = i;
+    }
+  }
+
+
+
+  //set colors
+  //endpoint
+  if (neighborCount == 1) {
+    int count = lastNeighbor + 1; //light up from "top" (connection to path)
+
+    FOREACH_FACE(f) {
+      //endpoint normal state shows points
+
+      if (hp > 0) {
+        if (count < hp + lastNeighbor + 1) {
+          if (hasBall && missed == true) setColorOnFace( CYAN, count % FACE_COUNT );
+          else {
+            if (swung && hasBall == false) setColorOnFace( dim( GREEN,60), count % FACE_COUNT );
+            else setColorOnFace( GREEN, count % FACE_COUNT );
+          }
+        }
+        else {
+          if (swung && hasBall == false)  setColorOnFace( dim( RED,60), count % FACE_COUNT );
+          else setColorOnFace( RED, count % FACE_COUNT );
+        }
+
+        count++;
+      }
+
+
+
+    }
+  } else if (neighborCount == 0 && endAnimCount == 0) { //blinks not connected to anything and not showing animation
+    spinAnimation(RED, 110);
+  }
+  else { //path
+    FOREACH_FACE(f) {
+      if ( showColorOnFaceTimer[f].isExpired() ) { //default color state
+        if (hasNeigbhorAtFace[f])  setColorOnFace( makeColorHSB( 33 , 255 , 255 ) , f );//path color
+        else setColorOnFace(OFF, f);
+        showColorOnFaceTimer[f].set( SHOW_COLOR_TIME_MS );
+      }
+    }
+  }
+
+  if (hp == 0) {
+    //game over animation
+    if (gameOverTimer.isExpired()) {
+      randomAnimation(RED, 30);
+      gameOverTimer.set( 30 );
+      endAnimCount++;
+    }
+
+    if (endAnimCount > 36) {
+      //reset
+      hasBall = true;
+      hp = FACE_COUNT ;
+      missed = true;
+      endAnimCount = 0;
+    }
+
+  }
+
+
+  //reset tile
+  if (buttonDoubleClicked()) {
+    if (neighborCount == 0 ) hp = 0; //set hp to 0 to force game over anim
+  }
+
+
+
   if (buttonPressed()) {
     // When the button is click, trigger a datagram send on all faces
-    if (neighborCount == 1 ) { //check if i'm an endpoint and have ball
+    if (neighborCount == 1 ) { //check if i'm an endpoint
 
       if (swung == false) { //only swing once
         swung = true;
@@ -236,28 +257,48 @@ void loop() {
       //serve ball
       if (missed) {
         if ( hasBall && millis() - lastReceivedBall > 500) { //prevent hitting the ball if we just missed the ball
-          shoot(.5);
+          shoot(.5); //shoot at half speed
         }
       }
-
-
     }
   }
+}
 
-  if (neighborCount == 0 && buttonDoubleClicked) {
-    hasBall = true;
-    hp = FACE_COUNT ;
-    missed = true;
+
+Timer animStepTimer;
+int animCount = 0;
+
+void spinAnimation(Color c, int delayTime) {
+  if (animStepTimer.isExpired()) {
+    setColor(c);
+    animCount++;
+    setColorOnFace( OFF, animCount % FACE_COUNT );
+    animStepTimer.set( delayTime );
   }
+}
 
+void randomAnimation(Color c, int delayTime) {
+  if (animStepTimer.isExpired()) {
+    setColor(c);
+    animCount++;
+    setColorOnFace( OFF, random( FACE_COUNT ));
+    animStepTimer.set( delayTime );
+  }
+}
+
+void swingAnimation(Color c, int delayTime) {
+  if (animStepTimer.isExpired()) {
+    setColor(c);
+    animCount++;
+    setColorOnFace( OFF, animCount % FACE_COUNT );
+    animStepTimer.set( delayTime );
+  }
 }
 
 
 
 void shoot(float ballSpeed) {//0-1
-
   byte s = ballSpeed * slowestBallSpeed;
-
   FOREACH_FACE(f) {
     ball[0] = byte(s); //random speed
     //ball[1] = byte(int(random(5))); //when to show
