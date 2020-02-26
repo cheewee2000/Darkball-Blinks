@@ -48,14 +48,15 @@ int sendBall = -1;
 byte hp = FACE_COUNT ;
 byte lastNeighbor;
 long lastReceivedBall = 0;
-int ballResponseRange = 200;
+int ballResponseRange = 100;
 boolean hasBall = true;
 boolean missed = true;
 boolean swung = false;
 long lastSwing = 0;
 int slowestBallSpeed = 110; //bigger is slower
 int endAnimCount = 0;
-
+long lastWasEndpoint = 0;
+boolean superMode = false;
 
 void setup() {
   setValueSentOnAllFaces(MAGIC_VALUE);
@@ -80,7 +81,13 @@ void loop() {
   //pass the ball along
   if (sendBall >= 0) { //if i have the ball
     if (millis() - lastMillis > ball[0]) { //wait ball speed
-      setColorOnFace( OFF ,  sendBall  ); //turn off lights
+      if (superMode) {
+        if (ball[2] % 4 == 0)setColorOnFace( OFF ,  sendBall  ); //turn off lights every few tiles'
+        ball[2]++;
+      }
+      else {
+        setColorOnFace( OFF ,  sendBall  ); //turn off lights
+      }
       sendDatagramOnFace( &ball , sizeof( ball ) , sendBall ); //send ball
       showColorOnFaceTimer[sendBall].set( SHOW_COLOR_TIME_MS ); //set face color
       sendBall = -1; //set sendball to -1
@@ -111,6 +118,9 @@ void loop() {
         // This is the datagram we are looking for!
         //update ball
         ball[0] = datagramPayload[0]; //get ball speed
+        ball[1] = datagramPayload[1]; //get ball superMode
+        ball[2] = datagramPayload[2]; //get ball superMode counter
+        superMode = ball[1];
 
         setColorOnFace( OFF , f ); // draw dark ball
         lastMillis = millis();
@@ -172,26 +182,34 @@ void loop() {
     }
   }
 
+  //allow swinging again after 1 second
+  if (swung && millis() - lastSwing >= 500) {
+    swung = false;
+  }
 
 
   //set colors
   //endpoint
   if (neighborCount == 1) {
     int count = lastNeighbor + 1; //light up from "top" (connection to path)
+    lastWasEndpoint = millis();
 
     FOREACH_FACE(f) {
       //endpoint normal state shows points
 
       if (hp > 0) {
         if (count < hp + lastNeighbor + 1) {
-          if (hasBall && missed == true) setColorOnFace( CYAN, count % FACE_COUNT );
+          if (hasBall && missed == true) {
+            if (superMode)setColorOnFace( WHITE, count % FACE_COUNT );
+            else setColorOnFace( CYAN, count % FACE_COUNT );
+          }
           else {
-            if (swung && hasBall == false) setColorOnFace( dim( GREEN,60), count % FACE_COUNT );
+            if (swung && hasBall == false) setColorOnFace( dim( GREEN, 60), count % FACE_COUNT );
             else setColorOnFace( GREEN, count % FACE_COUNT );
           }
         }
         else {
-          if (swung && hasBall == false)  setColorOnFace( dim( RED,60), count % FACE_COUNT );
+          if (swung && hasBall == false)  setColorOnFace( dim( RED, 60), count % FACE_COUNT );
           else setColorOnFace( RED, count % FACE_COUNT );
         }
 
@@ -201,6 +219,7 @@ void loop() {
 
 
     }
+
   } else if (neighborCount == 0 && endAnimCount == 0) { //blinks not connected to anything and not showing animation
     spinAnimation(RED, 110);
   }
@@ -223,11 +242,7 @@ void loop() {
     }
 
     if (endAnimCount > 36) {
-      //reset
-      hasBall = true;
-      hp = FACE_COUNT ;
-      missed = true;
-      endAnimCount = 0;
+      reset();
     }
 
   }
@@ -237,9 +252,12 @@ void loop() {
   if (buttonDoubleClicked()) {
     if (neighborCount == 0 ) hp = 0; //set hp to 0 to force game over anim
   }
+  if ( millis() - lastWasEndpoint > 5000) {
+    if (neighborCount == 0 || neighborCount > 1) reset(); //reset quietly if tile is no longer an endpoint
+  }
 
 
-
+  //swing paddle
   if (buttonPressed()) {
     // When the button is click, trigger a datagram send on all faces
     if (neighborCount == 1 ) { //check if i'm an endpoint
@@ -262,8 +280,25 @@ void loop() {
       }
     }
   }
+
+  //supermode
+  if (buttonMultiClicked()) {
+    if (neighborCount == 0 ) {
+      superMode = !superMode;
+      hp = 0;
+    }
+
+  }
 }
 
+void reset() {
+  //reset
+  hasBall = true;
+  hp = FACE_COUNT ;
+  missed = true;
+  endAnimCount = 0;
+
+}
 
 Timer animStepTimer;
 int animCount = 0;
@@ -301,7 +336,8 @@ void shoot(float ballSpeed) {//0-1
   byte s = ballSpeed * slowestBallSpeed;
   FOREACH_FACE(f) {
     ball[0] = byte(s); //random speed
-    //ball[1] = byte(int(random(5))); //when to show
+    ball[1] = superMode;
+    ball[2] = 0; //superMode when to show counter
     sendDatagramOnFace( &ball , sizeof( ball ) , f );
   }
   missed = false;
