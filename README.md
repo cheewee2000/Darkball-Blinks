@@ -17,9 +17,10 @@ Darkball is a game by CW&T for Blinks
 ## Tiles
 - Cyan tiles are endpoints that have the ball.
 - Green tiles are endpoints without the ball.
-- Yellow tiles are paths
+- Orange tiles are paths
 - Red tiles aren't connected to anything. 
 - Double click red tiles to reset the tile to use as a new endpoint.
+- Tribple click red tiles to enable Super Mode.
 
 
 ## Rules
@@ -29,7 +30,8 @@ Darkball is a game by CW&T for Blinks
 - If a player hits the ball to early or too late, they lose a point. 
 - Game ends when a player loses all six points.
 
-
+## Super Mode
+- In Super Mode, the ball will only appear once in a while along the path, making it much hard to predict when the ball will arrive.
 
 
 ## Issues
