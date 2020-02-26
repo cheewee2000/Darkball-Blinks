@@ -35,5 +35,5 @@ Darkball is a game by CW&T for Blinks
 
 
 ## Issues
-- no juicy animations yet
+- needs more juicy animations?
 
