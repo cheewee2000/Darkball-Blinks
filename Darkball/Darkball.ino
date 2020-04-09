@@ -26,6 +26,7 @@
 
 */
 
+#define DURATION_FOR_GAME_PIECE_TO_RESET 5000 // 5 seconds to reset a paddle
 
 // Did we get an error onthis face recently?
 Timer errorOnFaceTimer[ FACE_COUNT ];
@@ -34,6 +35,7 @@ const int showErrTime_ms = 500;    // Show the errror for 0.5 second so people c
 
 static Timer showColorOnFaceTimer[ FACE_COUNT ];
 static Timer gameOverTimer;
+long timeBallLastOnFace[ FACE_COUNT ];
 
 #define SHOW_COLOR_TIME_MS  110   // Long enough to see
 
@@ -89,7 +91,10 @@ void loop() {
         setColorOnFace( OFF ,  sendBall  ); //turn off lights
       }
       sendDatagramOnFace( &ball , sizeof( ball ) , sendBall ); //send ball
+      // TODO: is this how the dark ball is actually drawn? 
+      // This handles the sending face
       showColorOnFaceTimer[sendBall].set( SHOW_COLOR_TIME_MS ); //set face color
+      timeBallLastOnFace[sendBall] = millis();
       sendBall = -1; //set sendball to -1
     }
   }
@@ -110,10 +115,6 @@ void loop() {
 
       const byte *datagramPayload = getDatagramOnFace(f);
 
-      // Check that the length and all of the data btyes of the recieved datagram match what we were expecting
-      // Note that `memcmp()` returns 0 if it is a match
-
-      //if ( getDatagramLengthOnFace(f) == sizeof( ball )  &&  !memcmp( datagramPayload , ball , sizeof( ball )) )
       {
         // This is the datagram we are looking for!
         //update ball
@@ -123,6 +124,10 @@ void loop() {
         superMode = ball[1];
 
         setColorOnFace( OFF , f ); // draw dark ball
+        // TODO: is this how the dark ball is actually drawn? 
+        // This seems to handle the receiving face
+        showColorOnFaceTimer[f].set( SHOW_COLOR_TIME_MS ); //set face color
+        timeBallLastOnFace[f] = millis();
         lastMillis = millis();
 
         int avalableNeighboringFaces[FACE_COUNT];
@@ -225,11 +230,26 @@ void loop() {
   }
   else { //path
     FOREACH_FACE(f) {
-      if ( showColorOnFaceTimer[f].isExpired() ) { //default color state
-        if (hasNeigbhorAtFace[f])  setColorOnFace( makeColorHSB( 33 , 255 , 255 ) , f );//path color
-        else setColorOnFace(OFF, f);
-        showColorOnFaceTimer[f].set( SHOW_COLOR_TIME_MS );
+      if (hasNeigbhorAtFace[f]) {
+          // If the ball is hit perfectly, have the trail sparkle
+          // TODO: Only do this when ball speed is XXX
+          // after the ball passes, leave a trail of color/sparkle
+          long timeSinceBall = millis() - timeBallLastOnFace[f];
+          if(timeSinceBall > 500) {
+            timeSinceBall = 500;
+          }
+          byte hueShift = 80 - map(timeSinceBall, 0, 500, 0, 80);
+          byte hue = 20 - hueShift;  // the byte wraps this with no problems
+          byte bri = 255 - random(hueShift);
+          setColorOnFace( makeColorHSB( hue, 255 , bri ) , f );//path color
       }
+      else { 
+        setColorOnFace(OFF, f);
+      }
+      if(!showColorOnFaceTimer[f].isExpired()) {
+        setColorOnFace(OFF,f);
+      }
+        
     }
   }
 
@@ -252,7 +272,7 @@ void loop() {
   if (buttonDoubleClicked()) {
     if (neighborCount == 0 ) hp = 0; //set hp to 0 to force game over anim
   }
-  if ( millis() - lastWasEndpoint > 5000) {
+  if ( millis() - lastWasEndpoint > DURATION_FOR_GAME_PIECE_TO_RESET ) {
     if (neighborCount == 0 || neighborCount > 1) reset(); //reset quietly if tile is no longer an endpoint
   }
 
