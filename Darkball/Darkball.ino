@@ -1,4 +1,5 @@
-/*Darkball
+/*
+   Darkball
    by Che-Wei Wang,  CW&T
    for Blinks by Move38
 
@@ -12,21 +13,19 @@
   each player plays at one endpoint. finger on the end tile
 
 
-   cyan endpoints can send the ball along the path
-   green endpoints try to hit the ball back
-   if players swing too late, or swing too early, they lose a point
+  cyan endpoints can send the ball along the path
+  green endpoints try to hit the ball back
+  if players swing too late, or swing too early, they lose a point
   game ends when one player to loses 6 points
-
-  todo:
-
-  change path color
-  juicy stuff
-  color sparkle trail. based on speed. hue wave, and saturation 200m
-  double click for super mode
 
 */
 
-#define DURATION_FOR_GAME_PIECE_TO_RESET 5000 // 5 seconds to reset a paddle
+#define DURATION_FOR_GAME_PIECE_TO_RESET  5000  // 5 seconds to reset a paddle
+#define SHOW_COLOR_TIME_MS                110   // 0.11 Duration of darkball (Long enough to see)
+#define EXHAUST_TRAIL_DURATION            500   // 0.5 seconds of a trail
+#define DEFAULT_HUE                       20    // Orange color for track
+#define MAX_HUE_SHIFT                     80    // Shift the trail into the blues  
+
 
 // Did we get an error onthis face recently?
 Timer errorOnFaceTimer[ FACE_COUNT ];
@@ -36,8 +35,6 @@ const int showErrTime_ms = 500;    // Show the errror for 0.5 second so people c
 static Timer showColorOnFaceTimer[ FACE_COUNT ];
 static Timer gameOverTimer;
 long timeBallLastOnFace[ FACE_COUNT ];
-
-#define SHOW_COLOR_TIME_MS  110   // Long enough to see
 
 byte ball[] { 1, 0, 6, 3 }; //speed, n rounds ball has been played, last path length, position to blink,
 
@@ -91,7 +88,7 @@ void loop() {
         setColorOnFace( OFF ,  sendBall  ); //turn off lights
       }
       sendDatagramOnFace( &ball , sizeof( ball ) , sendBall ); //send ball
-      // TODO: is this how the dark ball is actually drawn? 
+      // TODO: is this how the dark ball is actually drawn?
       // This handles the sending face
       showColorOnFaceTimer[sendBall].set( SHOW_COLOR_TIME_MS ); //set face color
       timeBallLastOnFace[sendBall] = millis();
@@ -124,7 +121,7 @@ void loop() {
         superMode = ball[1];
 
         setColorOnFace( OFF , f ); // draw dark ball
-        // TODO: is this how the dark ball is actually drawn? 
+        // TODO: is this how the dark ball is actually drawn?
         // This seems to handle the receiving face
         showColorOnFaceTimer[f].set( SHOW_COLOR_TIME_MS ); //set face color
         timeBallLastOnFace[f] = millis();
@@ -231,25 +228,25 @@ void loop() {
   else { //path
     FOREACH_FACE(f) {
       if (hasNeigbhorAtFace[f]) {
-          // If the ball is hit perfectly, have the trail sparkle
-          // TODO: Only do this when ball speed is XXX
-          // after the ball passes, leave a trail of color/sparkle
-          long timeSinceBall = millis() - timeBallLastOnFace[f];
-          if(timeSinceBall > 500) {
-            timeSinceBall = 500;
-          }
-          byte hueShift = 80 - map(timeSinceBall, 0, 500, 0, 80);
-          byte hue = 20 - hueShift;  // the byte wraps this with no problems
-          byte bri = 255 - random(hueShift);
-          setColorOnFace( makeColorHSB( hue, 255 , bri ) , f );//path color
+        // If the ball is hit perfectly, have the trail sparkle
+        // TODO: Only do this when ball speed is XXX
+        // after the ball passes, leave a trail of color/sparkle
+        long timeSinceBall = millis() - timeBallLastOnFace[f];
+        if (timeSinceBall > EXHAUST_TRAIL_DURATION) {
+          timeSinceBall = EXHAUST_TRAIL_DURATION;
+        }
+        byte hueShift = MAX_HUE_SHIFT - map(timeSinceBall, 0, EXHAUST_TRAIL_DURATION, 0, MAX_HUE_SHIFT);
+        byte hue = DEFAULT_HUE - hueShift;  // the byte wraps this with no problems
+        byte bri = 255 - random(hueShift);
+        setColorOnFace( makeColorHSB( hue, 255 , bri ) , f );//path color
       }
-      else { 
+      else {
         setColorOnFace(OFF, f);
       }
-      if(!showColorOnFaceTimer[f].isExpired()) {
-        setColorOnFace(OFF,f);
+      if (!showColorOnFaceTimer[f].isExpired()) {
+        setColorOnFace(OFF, f);
       }
-        
+
     }
   }
 
