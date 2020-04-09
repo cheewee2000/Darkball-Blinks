@@ -223,7 +223,7 @@ void loop() {
     }
 
   } else if (neighborCount == 0 && endAnimCount == 0) { //blinks not connected to anything and not showing animation
-    spinAnimation(RED, 110);
+    spinAnimation(110);
   }
   else { //path
     FOREACH_FACE(f) {
@@ -320,11 +320,17 @@ void reset() {
 Timer animStepTimer;
 int animCount = 0;
 
-void spinAnimation(Color c, int delayTime) {
+void spinAnimation(int delayTime) {
   if (animStepTimer.isExpired()) {
-    setColor(c);
-    animCount++;
+    //
+    FOREACH_FACE(f) {
+      byte dist = (f + 6 - (animCount % FACE_COUNT)) % FACE_COUNT;
+      // reverse it:
+      dist = 6 - dist; 
+      setColorOnFace( makeColorHSB(DEFAULT_HUE - (dist* MAX_HUE_SHIFT/6), 255, 255 - 40*dist), f);
+    }
     setColorOnFace( OFF, animCount % FACE_COUNT );
+    animCount++;
     animStepTimer.set( delayTime );
   }
 }
