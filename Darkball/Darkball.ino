@@ -81,17 +81,23 @@ void loop() {
   if (sendBall >= 0) { //if i have the ball
     if (millis() - lastMillis > ball[0]) { //wait ball speed
       if (superMode) {
-        if (ball[2] % 4 == 0)setColorOnFace( OFF ,  sendBall  ); //turn off lights every few tiles'
+        if (ball[2] % 4 == 0) {
+          setColorOnFace( OFF ,  sendBall  ); //turn off lights every few tiles'
+          // This handles the sending face
+          showColorOnFaceTimer[sendBall].set( SHOW_COLOR_TIME_MS ); //set face color
+          timeBallLastOnFace[sendBall] = millis();
+        }
         ball[2]++;
       }
       else {
         setColorOnFace( OFF ,  sendBall  ); //turn off lights
+        // This handles the sending face
+        showColorOnFaceTimer[sendBall].set( SHOW_COLOR_TIME_MS ); //set face color
+        timeBallLastOnFace[sendBall] = millis();
       }
       sendDatagramOnFace( &ball , sizeof( ball ) , sendBall ); //send ball
       // TODO: is this how the dark ball is actually drawn?
-      // This handles the sending face
-      showColorOnFaceTimer[sendBall].set( SHOW_COLOR_TIME_MS ); //set face color
-      timeBallLastOnFace[sendBall] = millis();
+
       sendBall = -1; //set sendball to -1
     }
   }
@@ -232,10 +238,12 @@ void loop() {
         // TODO: Only do this when ball speed is XXX
         // after the ball passes, leave a trail of color/sparkle
         long timeSinceBall = millis() - timeBallLastOnFace[f];
-        if (timeSinceBall > EXHAUST_TRAIL_DURATION) {
-          timeSinceBall = EXHAUST_TRAIL_DURATION;
+        word exhaust_trail_duration = 2* (100-ball[0]) * EXHAUST_TRAIL_DURATION / 100;
+        
+        if (timeSinceBall > exhaust_trail_duration) {
+          timeSinceBall = exhaust_trail_duration;
         }
-        byte hueShift = MAX_HUE_SHIFT - map(timeSinceBall, 0, EXHAUST_TRAIL_DURATION, 0, MAX_HUE_SHIFT);
+        byte hueShift = MAX_HUE_SHIFT - map(timeSinceBall, 0, exhaust_trail_duration, 0, MAX_HUE_SHIFT);
         byte hue = DEFAULT_HUE - hueShift;  // the byte wraps this with no problems
         byte bri = 255 - random(hueShift);
         setColorOnFace( makeColorHSB( hue, 255 , bri ) , f );//path color
@@ -326,8 +334,8 @@ void spinAnimation(int delayTime) {
     FOREACH_FACE(f) {
       byte dist = (f + 6 - (animCount % FACE_COUNT)) % FACE_COUNT;
       // reverse it:
-      dist = 6 - dist; 
-      setColorOnFace( makeColorHSB(DEFAULT_HUE - (dist* MAX_HUE_SHIFT/6), 255, 255 - 40*dist), f);
+      dist = 6 - dist;
+      setColorOnFace( makeColorHSB(DEFAULT_HUE - (dist * MAX_HUE_SHIFT / 6), 255, 255 - 40 * dist), f);
     }
     setColorOnFace( OFF, animCount % FACE_COUNT );
     animCount++;
