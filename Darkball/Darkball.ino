@@ -58,6 +58,7 @@ long lastWasEndpoint = 0;
 boolean superMode = false;
 
 void setup() {
+  randomize();
   setValueSentOnAllFaces(MAGIC_VALUE);
 }
 
@@ -245,8 +246,13 @@ void loop() {
         }
         byte hueShift = MAX_HUE_SHIFT - map(timeSinceBall, 0, exhaust_trail_duration, 0, MAX_HUE_SHIFT);
         byte hue = DEFAULT_HUE - hueShift;  // the byte wraps this with no problems
-        byte bri = 255 - random(hueShift);
-        setColorOnFace( makeColorHSB( hue, 255 , bri ) , f );//path color
+        byte bri = 255; // leave the brightness up,  could be worth experimenting with for sparkle
+        byte sat;
+        if(ball[0] < 10 && timeSinceBall < 300) // only sparkle when the ball is traveling at a speed <10 that's fast
+          sat = 255 - 80*random(3);//hueShift/20);
+        else
+          sat = 255;
+        setColorOnFace( makeColorHSB( hue, sat , bri ) , f );//path color
       }
       else {
         setColorOnFace(OFF, f);
